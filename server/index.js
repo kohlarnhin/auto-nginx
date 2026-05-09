@@ -223,7 +223,7 @@ async function ensureDNSRecord(token, domain) {
   if (existing.success && existing.result?.length > 0) {
     const record = existing.result[0];
     if (record.content === ip) {
-      return { action: 'exists', ip, message: `DNS 记录已存在 (${domain} → ${ip})` };
+      return { action: 'exists', message: `DNS 已就绪` };
     }
     // Update existing record to point to current IP
     await cfFetch(token, `/zones/${zoneId}/dns_records/${record.id}`, 'PUT', {
@@ -233,7 +233,7 @@ async function ensureDNSRecord(token, domain) {
       ttl: 1, // auto
       proxied: false,
     });
-    return { action: 'updated', ip, message: `DNS 记录已更新 (${domain} → ${ip})` };
+    return { action: 'updated', message: `DNS 已更新` };
   }
 
   // Create new record
@@ -247,7 +247,7 @@ async function ensureDNSRecord(token, domain) {
   if (!create.success) {
     throw new Error(`创建 DNS 记录失败: ${create.errors?.[0]?.message || JSON.stringify(create.errors)}`);
   }
-  return { action: 'created', ip, message: `DNS 记录已创建 (${domain} → ${ip})` };
+  return { action: 'created', message: `DNS 已创建` };
 }
 
 // ===================== API =====================

@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import {
   Server, Settings, Check, X, Globe, Plus, Trash2,
-  Shield, ChevronRight, Search, Download, Lock
+  Shield, ChevronRight, ChevronDown, Search, Download, Lock, Cloud
 } from 'lucide-react';
 
 const API = '/api';
 
 /* ── Toast ── */
-function Toast({ data, onClose }) {
+const Toast = memo(function Toast({ data, onClose }) {
   useEffect(() => {
     if (!data) return;
     const t = setTimeout(onClose, 3500);
@@ -20,6 +20,23 @@ function Toast({ data, onClose }) {
         {data.type === 'success' ? <Check size={14} /> : <X size={14} />}
         {data.message}
       </div>
+    </div>
+  );
+});
+
+/* ── Collapsible Section ── */
+function Section({ label, badge, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="fg">
+      <button className="sec-toggle" onClick={() => setOpen(!open)}>
+        <span className="sec-label">{label}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {badge}
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+      </button>
+      {open && <div className="sec-content">{children}</div>}
     </div>
   );
 }
@@ -45,7 +62,7 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
       const d = await r.json();
       if (r.ok) { notify({ type: 'success', message: d.message }); setCf(null); setKf(null); onRefresh(); }
       else notify({ type: 'error', message: d.error });
-    } catch (e) { notify({ type: 'error', message: e.message }); }
+    } catch (e) { notify({ type: 'error', message: '网络错误，请重试' }); }
     finally { setUping(false); }
   };
 
@@ -61,9 +78,12 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
       const d = await r.json();
       notify({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
       if (r.ok) { setCfToken(''); onRefresh(); }
-    } catch (e) { notify({ type: 'error', message: e.message }); }
+    } catch (e) { notify({ type: 'error', message: '网络错误，请重试' }); }
     finally { setSavingToken(false); }
   };
+
+  const okBadge = <span className="badge-ok"><Check size={10} /> 就绪</span>;
+  const errBadge = <span className="badge-err">未配置</span>;
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -74,8 +94,7 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
         </div>
         <div className="dlg-body">
           {/* Nginx */}
-          <div className="fg">
-            <span className="sec-label">Nginx 引擎</span>
+          <Section label="Nginx 引擎" defaultOpen={!nginx?.installed} badge={nginx?.installed ? okBadge : errBadge}>
             <div className="info-box">
               <div className="info-row">
                 <span className="info-label">安装</span>
@@ -95,56 +114,40 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
               )}
             </div>
             {!nginx?.installed && (
-              <button className="btn btn-primary" onClick={onInstall} disabled={installing || !nginx?.canAutoInstall} style={{ width: '100%' }}>
+              <button className="btn btn-primary" onClick={onInstall} disabled={installing || !nginx?.canAutoInstall} style={{ width: '100%', marginTop: 8 }}>
                 {installing ? <><span className="spin" /> 安装中…</> : <><Download size={14} /> {nginx?.canAutoInstall ? `通过 ${nginx.packageManager} 安装` : '需手动安装'}</>}
               </button>
             )}
-          </div>
+          </Section>
 
           <div className="sep" />
 
           {/* SSL */}
-          <div className="fg">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="sec-label">SSL 证书</span>
-              {status?.certReady && (
-                <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Lock size={10} /> 已配置
-                </span>
-              )}
-            </div>
+          <Section label="SSL 证书" defaultOpen={!status?.certReady} badge={status?.certReady ? okBadge : errBadge}>
             <div className="up-grid">
               <label className={`up ${cf ? 'filled' : ''}`}>
                 <input type="file" accept=".pem,.crt,.cer" onChange={e => setCf(e.target.files[0])} />
-                <div className="up-text">{cf ? cf.name : '证书文件 .crt'}</div>
+                <div className="up-text">{cf ? cf.name : '证书 .crt'}</div>
               </label>
               <label className={`up ${kf ? 'filled' : ''}`}>
                 <input type="file" accept=".pem,.key" onChange={e => setKf(e.target.files[0])} />
-                <div className="up-text">{kf ? kf.name : '私钥文件 .key'}</div>
+                <div className="up-text">{kf ? kf.name : '私钥 .key'}</div>
               </label>
             </div>
-            <button className="btn btn-secondary" onClick={uploadCert} disabled={uping || !cf || !kf} style={{ width: '100%' }}>
+            <button className="btn btn-secondary" onClick={uploadCert} disabled={uping || !cf || !kf} style={{ width: '100%', marginTop: 8 }}>
               {uping ? <><span className="spin" /> 上传中…</> : <><Shield size={14} /> 应用证书</>}
             </button>
-          </div>
+          </Section>
 
           <div className="sep" />
 
           {/* Cloudflare */}
-          <div className="fg">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="sec-label">Cloudflare DNS</span>
-              {status?.cfTokenSet && (
-                <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Check size={10} /> 已配置
-                </span>
-              )}
-            </div>
+          <Section label="Cloudflare DNS" defaultOpen={!status?.cfTokenSet} badge={status?.cfTokenSet ? okBadge : errBadge}>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 className="fi"
                 type="password"
-                placeholder={status?.cfTokenSet ? '已保存，输入新值可覆盖' : 'Cloudflare API Token'}
+                placeholder={status?.cfTokenSet ? '已保存，输入新值可覆盖' : 'API Token'}
                 value={cfToken}
                 onChange={e => setCfToken(e.target.value)}
                 style={{ flex: 1 }}
@@ -153,8 +156,8 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
                 {savingToken ? <span className="spin" /> : '保存'}
               </button>
             </div>
-            <div className="fh">配置后添加站点时将自动创建 DNS A 记录指向本机公网 IP</div>
-          </div>
+            <div className="fh">添加站点时自动创建 DNS 解析</div>
+          </Section>
         </div>
       </div>
     </div>
@@ -184,7 +187,7 @@ function AddModal({ show, onClose, onDone, notify }) {
       const d = await r.json();
       if (r.ok) { notify({ type: 'success', message: d.message }); setName(''); setDomain(''); setPort(''); onDone(); onClose(); }
       else notify({ type: 'error', message: d.error });
-    } catch (e) { notify({ type: 'error', message: e.message }); }
+    } catch (e) { notify({ type: 'error', message: '网络错误，请重试' }); }
     finally { setBusy(false); }
   };
 
@@ -198,29 +201,45 @@ function AddModal({ show, onClose, onDone, notify }) {
         <div className="dlg-body">
           <div className="fg">
             <label className="fl">站点名称</label>
-            <input className="fi" placeholder="如：官网、后台API" value={name} onChange={e => setName(e.target.value)} />
+            <input className="fi" placeholder="如：官网、后台" value={name} onChange={e => setName(e.target.value)} />
           </div>
           <div className="fg">
             <label className="fl">域名</label>
             <input className="fi" placeholder="如：www.example.com" value={domain} onChange={e => setDomain(e.target.value)} />
-            <div className="fh">使用已上传证书对应的域名或子域名</div>
           </div>
           <div className="fg">
             <label className="fl">本地端口</label>
             <input className="fi" type="number" min="1" max="65535" placeholder="3000" value={port} onChange={e => setPort(e.target.value)} />
-            <div className="fh">代理至 127.0.0.1:{port || '…'}</div>
           </div>
         </div>
         <div className="dlg-foot">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
           <button className="btn btn-primary" onClick={save} disabled={busy || !name.trim() || !domain.trim() || !port.trim()}>
-            {busy ? <span className="spin" /> : '添加'}
+            {busy ? <><span className="spin" /> 部署中…</> : '添加'}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+/* ── Site Card ── */
+const SiteCard = memo(function SiteCard({ site, onDel }) {
+  return (
+    <div className="card">
+      <div className="card-icon"><Globe size={20} /></div>
+      <div className="card-body">
+        <div className="card-name">{site.name}</div>
+        <div className="card-sub">{site.domain} → :{site.port}</div>
+      </div>
+      <div className="card-actions">
+        <button className="btn btn-danger btn-sm" onClick={() => onDel(site.name)}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  );
+});
 
 /* ── App ── */
 export default function App() {
@@ -244,35 +263,35 @@ export default function App() {
 
   useEffect(() => { loadNginx(); loadStatus(); }, [loadNginx, loadStatus]);
 
-  const doInstall = async () => {
+  const doInstall = useCallback(async () => {
     setInst(true);
     try {
       const r = await fetch(`${API}/nginx-install`, { method: 'POST' });
       const d = await r.json();
       setToast({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
       if (r.ok) loadNginx();
-    } catch (e) { setToast({ type: 'error', message: e.message }); }
+    } catch (e) { setToast({ type: 'error', message: '安装失败，请重试' }); }
     finally { setInst(false); }
-  };
+  }, [loadNginx]);
 
-
-
-  const doDel = async (n) => {
+  const doDel = useCallback(async (n) => {
     if (!confirm(`确定删除站点「${n}」？`)) return;
     try {
       const r = await fetch(`${API}/sites/${encodeURIComponent(n)}`, { method: 'DELETE' });
       const d = await r.json();
       setToast({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
       if (r.ok) loadStatus();
-    } catch (e) { setToast({ type: 'error', message: e.message }); }
-  };
+    } catch (e) { setToast({ type: 'error', message: '操作失败，请重试' }); }
+  }, [loadStatus]);
 
   const sites = status?.sites || [];
-  const list = sites.filter(s =>
-    s.name.toLowerCase().includes(q.toLowerCase()) ||
-    s.domain?.toLowerCase().includes(q.toLowerCase()) ||
-    s.port?.includes(q)
-  );
+  const list = q
+    ? sites.filter(s =>
+        s.name.toLowerCase().includes(q.toLowerCase()) ||
+        s.domain?.toLowerCase().includes(q.toLowerCase()) ||
+        s.port?.includes(q)
+      )
+    : sites;
 
   return (
     <>
@@ -282,7 +301,7 @@ export default function App() {
 
       <main className="main">
         <h1 className="page-title">HTTPS 部署管理</h1>
-        <p className="page-desc">上传 SSL 证书，配置站点域名与端口，一键发布至 Nginx。</p>
+        <p className="page-desc">上传 SSL 证书，配置站点域名与端口，自动部署至 Nginx。</p>
 
         {/* Status Strip */}
         <div className="strip" onClick={() => setModal('settings')} role="button" tabIndex={0}>
@@ -308,7 +327,13 @@ export default function App() {
                     {status?.certReady ? '就绪' : '未上传'}
                   </span>
                 </div>
-
+                <div className="strip-item">
+                  <span className="strip-label">DNS</span>
+                  <span className="strip-val">
+                    <span className={`ind ${status?.cfTokenSet ? 'ind-ok' : 'ind-warn'}`} />
+                    {status?.cfTokenSet ? '已配置' : '未配置'}
+                  </span>
+                </div>
               </>
             )}
           </div>
@@ -317,7 +342,7 @@ export default function App() {
 
         {/* Section Head */}
         <div className="section-head">
-          <span className="section-title">站点列表</span>
+          <span className="section-title">站点列表 {sites.length > 0 && <span style={{ opacity: 0.5 }}>({sites.length})</span>}</span>
         </div>
 
         {/* Action Row */}
@@ -336,29 +361,15 @@ export default function App() {
               <div className="empty-icon"><Server size={24} /></div>
               <div className="empty-title">{sites.length === 0 ? '尚无站点' : '没有匹配结果'}</div>
               <div className="empty-desc">
-                {sites.length === 0 ? '新建站点，配置域名和端口即可快速部署 HTTPS 服务。' : '试试其他关键词。'}
+                {sites.length === 0 ? '点击「新建」添加你的第一个站点。' : '试试其他关键词。'}
               </div>
             </div>
           ) : (
-            list.map(s => (
-              <div key={s.name} className="card">
-                <div className="card-icon"><Globe size={20} /></div>
-                <div className="card-body">
-                  <div className="card-name">{s.name}</div>
-                  <div className="card-sub">{s.domain} → :{s.port}</div>
-                </div>
-                <div className="card-actions">
-                  <button className="btn btn-danger btn-sm" onClick={() => doDel(s.name)}>
-                    <Trash2 size={14} /> 删除
-                  </button>
-                </div>
-              </div>
-            ))
+            list.map(s => <SiteCard key={s.name} site={s} onDel={doDel} />)
           )}
         </div>
       </main>
 
-      {/* Modals */}
       {modal === 'settings' && (
         <SettingsModal show onClose={() => setModal(null)} nginx={nginx} onInstall={doInstall} installing={inst} status={status} notify={setToast} onRefresh={loadStatus} />
       )}
