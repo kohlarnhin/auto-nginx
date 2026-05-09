@@ -1,0 +1,22 @@
+{
+  "name": "auto-nginx",
+  "version": "1.0.0",
+  "description": "Auto Nginx - One-click HTTPS site deployment with certificate management",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
+    "dev:server": "node server/index.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "NODE_ENV=production node server/index.js",
+    "install:all": "npm install && cd frontend && npm install"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
