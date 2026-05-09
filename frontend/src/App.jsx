@@ -105,10 +105,9 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
                 <div className="up-text">{kf ? kf.name : '私钥文件 .key'}</div>
               </label>
             </div>
-            <button className="btn btn-secondary" onClick={uploadCert} disabled={uping || !cf || !kf || !status?.domain} style={{ width: '100%' }}>
+            <button className="btn btn-secondary" onClick={uploadCert} disabled={uping || !cf || !kf} style={{ width: '100%' }}>
               {uping ? <><span className="spin" /> 上传中…</> : <><Shield size={14} /> 应用证书</>}
             </button>
-            {!status?.domain && <div className="fh" style={{ color: 'var(--err)' }}>请先保存主域名</div>}
           </div>
         </div>
       </div>
@@ -264,10 +263,7 @@ export default function App() {
                     {nginx?.installed ? (nginx.running ? '在线' : '已停止') : '未安装'}
                   </span>
                 </div>
-                <div className="strip-item">
-                  <span className="strip-label">域名</span>
-                  <span className="strip-val">{status?.domain || '未配置'}</span>
-                </div>
+
                 <div className="strip-item">
                   <span className="strip-label">证书</span>
                   <span className="strip-val">
@@ -299,7 +295,7 @@ export default function App() {
             <input className="search-field" placeholder="搜索站点…" value={q} onChange={e => setQ(e.target.value)} />
           </div>
           <button className="btn btn-secondary" onClick={() => setModal('add')}><Plus size={16} /> 新建</button>
-          <button className="btn btn-primary" onClick={doDeploy} disabled={dep || !status?.domain || !status?.certReady || !sites.length}>
+          <button className="btn btn-primary" onClick={doDeploy} disabled={dep || !status?.certReady || !sites.length}>
             {dep ? <><span className="spin" /> 发布中</> : <><Rocket size={16} /> 发布</>}
           </button>
         </div>
