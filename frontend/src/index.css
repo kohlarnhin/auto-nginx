@@ -19,9 +19,9 @@
   --border: rgba(0, 0, 0, 0.06);
   --border-hover: rgba(0, 0, 0, 0.12);
 
-  --accent: #0071E3;
-  --accent-hover: #0077ED;
-  --accent-soft: rgba(0, 113, 227, 0.08);
+  --accent: #1A1A1A;
+  --accent-hover: #333333;
+  --accent-soft: rgba(0, 0, 0, 0.04);
   --accent-text: #FFFFFF;
 
   --ok: #34C759;
@@ -91,7 +91,7 @@ body {
 
 /* ===== MAIN ===== */
 .main {
-  max-width: 1080px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 56px 40px 100px;
 }
@@ -180,17 +180,17 @@ body {
 .strip-cta {
   font-size: 14px;
   font-weight: 500;
-  color: var(--accent);
+  color: var(--text-2);
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 8px 16px;
-  background: var(--accent-soft);
+  background: var(--bg-2);
   border-radius: var(--radius-full);
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
-.strip:hover .strip-cta { background: rgba(0, 113, 227, 0.12); }
+.strip:hover .strip-cta { background: var(--text); color: var(--bg-card); }
 
 /* ===== SECTION HEADING ===== */
 .section-head {
@@ -273,7 +273,7 @@ body {
 .btn-primary {
   background: var(--accent);
   color: var(--accent-text);
-  box-shadow: 0 2px 4px rgba(0, 113, 227, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
@@ -301,11 +301,10 @@ body {
 /* ===== SITE GRID ===== */
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 24px;
 }
 
-@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
 
 /* ===== APPLE STYLE CARD ===== */
@@ -340,10 +339,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #E5F0FF, #CCE0FF);
-  color: var(--accent);
+  background: linear-gradient(135deg, #F9F9FB, #EAEAEF);
+  color: var(--text);
   flex-shrink: 0;
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.8), 0 2px 6px rgba(0,0,0,0.04);
 }
 
 .card-body { flex: 1; min-width: 0; }
