@@ -118,22 +118,25 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
 /* ── Add Modal ── */
 function AddModal({ show, onClose, onDone, notify }) {
   const [name, setName] = useState('');
-  const [path, setPath] = useState('/');
+  const [domain, setDomain] = useState('');
   const [port, setPort] = useState('');
   const [busy, setBusy] = useState(false);
   if (!show) return null;
 
   const save = async () => {
-    if (!name.trim() || !port.trim()) { notify({ type: 'error', message: '请填写名称和端口' }); return; }
+    if (!name.trim() || !domain.trim() || !port.trim()) {
+      notify({ type: 'error', message: '请填写完整信息' });
+      return;
+    }
     setBusy(true);
     try {
       const r = await fetch(`${API}/sites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), path: path.trim() || '/', port: port.trim() }),
+        body: JSON.stringify({ name: name.trim(), domain: domain.trim(), port: port.trim() }),
       });
       const d = await r.json();
-      if (r.ok) { notify({ type: 'success', message: d.message }); setName(''); setPath('/'); setPort(''); onDone(); onClose(); }
+      if (r.ok) { notify({ type: 'success', message: d.message }); setName(''); setDomain(''); setPort(''); onDone(); onClose(); }
       else notify({ type: 'error', message: d.error });
     } catch (e) { notify({ type: 'error', message: e.message }); }
     finally { setBusy(false); }
@@ -143,28 +146,28 @@ function AddModal({ show, onClose, onDone, notify }) {
     <div className="overlay" onClick={onClose}>
       <div className="dialog" onClick={e => e.stopPropagation()}>
         <div className="dlg-head">
-          <h2>新建代理</h2>
+          <h2>新建站点</h2>
           <button className="dlg-x" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="dlg-body">
           <div className="fg">
-            <label className="fl">名称</label>
-            <input className="fi" placeholder="如：前端应用" value={name} onChange={e => setName(e.target.value)} />
+            <label className="fl">站点名称</label>
+            <input className="fi" placeholder="如：官网、后台API" value={name} onChange={e => setName(e.target.value)} />
           </div>
           <div className="fg">
-            <label className="fl">路径</label>
-            <input className="fi" placeholder="/" value={path} onChange={e => setPath(e.target.value)} />
-            <div className="fh">Nginx location 匹配路径</div>
+            <label className="fl">域名</label>
+            <input className="fi" placeholder="如：www.example.com" value={domain} onChange={e => setDomain(e.target.value)} />
+            <div className="fh">使用已上传证书对应的域名或子域名</div>
           </div>
           <div className="fg">
-            <label className="fl">端口</label>
+            <label className="fl">本地端口</label>
             <input className="fi" type="number" min="1" max="65535" placeholder="3000" value={port} onChange={e => setPort(e.target.value)} />
             <div className="fh">代理至 127.0.0.1:{port || '…'}</div>
           </div>
         </div>
         <div className="dlg-foot">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
-          <button className="btn btn-primary" onClick={save} disabled={busy || !name.trim() || !port.trim()}>
+          <button className="btn btn-primary" onClick={save} disabled={busy || !name.trim() || !domain.trim() || !port.trim()}>
             {busy ? <span className="spin" /> : '添加'}
           </button>
         </div>
@@ -219,7 +222,7 @@ export default function App() {
   };
 
   const doDel = async (n) => {
-    if (!confirm(`确定删除「${n}」？`)) return;
+    if (!confirm(`确定删除站点「${n}」？`)) return;
     try {
       const r = await fetch(`${API}/sites/${encodeURIComponent(n)}`, { method: 'DELETE' });
       const d = await r.json();
@@ -231,10 +234,9 @@ export default function App() {
   const sites = status?.sites || [];
   const list = sites.filter(s =>
     s.name.toLowerCase().includes(q.toLowerCase()) ||
-    s.path.includes(q) ||
-    s.port.includes(q)
+    s.domain?.toLowerCase().includes(q.toLowerCase()) ||
+    s.port?.includes(q)
   );
-  const live = status?.configExists && status?.enabled;
 
   return (
     <>
@@ -244,7 +246,7 @@ export default function App() {
 
       <main className="main">
         <h1 className="page-title">HTTPS 部署管理</h1>
-        <p className="page-desc">配置域名与 SSL 证书，管理反向代理规则，一键发布至 Nginx。</p>
+        <p className="page-desc">上传 SSL 证书，配置站点域名与端口，一键发布至 Nginx。</p>
 
         {/* Status Strip */}
         <div className="strip" onClick={() => setModal('settings')} role="button" tabIndex={0}>
@@ -263,7 +265,6 @@ export default function App() {
                     {nginx?.installed ? (nginx.running ? '在线' : '已停止') : '未安装'}
                   </span>
                 </div>
-
                 <div className="strip-item">
                   <span className="strip-label">证书</span>
                   <span className="strip-val">
@@ -271,7 +272,7 @@ export default function App() {
                     {status?.certReady ? '就绪' : '未上传'}
                   </span>
                 </div>
-                {live && (
+                {status?.deployed && (
                   <div className="strip-item">
                     <span className="strip-label">部署</span>
                     <span className="strip-val"><span className="ind ind-ok" /> 已生效</span>
@@ -285,7 +286,7 @@ export default function App() {
 
         {/* Section Head */}
         <div className="section-head">
-          <span className="section-title">代理规则</span>
+          <span className="section-title">站点列表</span>
         </div>
 
         {/* Action Row */}
@@ -305,9 +306,9 @@ export default function App() {
           {list.length === 0 ? (
             <div className="empty" style={{ gridColumn: '1 / -1' }}>
               <div className="empty-icon"><Server size={24} /></div>
-              <div className="empty-title">{sites.length === 0 ? '尚无代理规则' : '没有匹配结果'}</div>
+              <div className="empty-title">{sites.length === 0 ? '尚无站点' : '没有匹配结果'}</div>
               <div className="empty-desc">
-                {sites.length === 0 ? '新建一条代理规则，将域名下的路径转发到本地服务。' : '试试其他关键词。'}
+                {sites.length === 0 ? '新建站点，配置域名和端口即可快速部署 HTTPS 服务。' : '试试其他关键词。'}
               </div>
             </div>
           ) : (
@@ -316,7 +317,7 @@ export default function App() {
                 <div className="card-icon"><Globe size={20} /></div>
                 <div className="card-body">
                   <div className="card-name">{s.name}</div>
-                  <div className="card-sub">{s.path} → :{s.port}</div>
+                  <div className="card-sub">{s.domain} → :{s.port}</div>
                 </div>
                 <div className="card-actions">
                   <button className="btn btn-danger btn-sm" onClick={() => doDel(s.name)}>
