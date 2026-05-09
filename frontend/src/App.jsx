@@ -295,13 +295,14 @@ const SiteCard = memo(function SiteCard({ site, onDel, onEdit }) {
         <div className="card-icon"><Globe size={18} /></div>
         <div className="card-body">
           <div className="card-name">{site.name}</div>
-          <div className="card-sub">
-            <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" className="card-link" onClick={e => e.stopPropagation()}>
-              {site.domain} <ExternalLink size={11} />
-            </a>
-            <span style={{ color: 'var(--text-4)' }}>→ :{site.port}</span>
-          </div>
+          <div className="card-port">端口 {site.port}</div>
         </div>
+      </div>
+      <div className="card-domain">
+        <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" className="card-link" onClick={e => e.stopPropagation()}>
+          {site.domain} <ExternalLink size={11} />
+        </a>
+        <span className="card-port-tag">:{site.port}</span>
       </div>
       <div className="card-actions">
         <button className="btn btn-ghost btn-sm" onClick={() => onEdit(site)} title="编辑配置">
