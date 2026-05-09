@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Server, Settings, Check, X, Globe, Plus, Trash2,
-  Rocket, Shield, ChevronRight, Search, Download, Lock
+  Shield, ChevronRight, Search, Download, Lock
 } from 'lucide-react';
 
 const API = '/api';
@@ -185,7 +185,6 @@ export default function App() {
   const [q, setQ] = useState('');
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
-  const [dep, setDep] = useState(false);
 
   const loadNginx = useCallback(async () => {
     setChk(true);
@@ -210,16 +209,7 @@ export default function App() {
     finally { setInst(false); }
   };
 
-  const doDeploy = async () => {
-    setDep(true);
-    try {
-      const r = await fetch(`${API}/deploy`, { method: 'POST' });
-      const d = await r.json();
-      setToast({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
-      if (r.ok) loadStatus();
-    } catch (e) { setToast({ type: 'error', message: e.message }); }
-    finally { setDep(false); }
-  };
+
 
   const doDel = async (n) => {
     if (!confirm(`确定删除站点「${n}」？`)) return;
@@ -272,12 +262,7 @@ export default function App() {
                     {status?.certReady ? '就绪' : '未上传'}
                   </span>
                 </div>
-                {status?.deployed && (
-                  <div className="strip-item">
-                    <span className="strip-label">部署</span>
-                    <span className="strip-val"><span className="ind ind-ok" /> 已生效</span>
-                  </div>
-                )}
+
               </>
             )}
           </div>
@@ -295,10 +280,7 @@ export default function App() {
             <Search size={16} />
             <input className="search-field" placeholder="搜索站点…" value={q} onChange={e => setQ(e.target.value)} />
           </div>
-          <button className="btn btn-secondary" onClick={() => setModal('add')}><Plus size={16} /> 新建</button>
-          <button className="btn btn-primary" onClick={doDeploy} disabled={dep || !status?.certReady || !sites.length}>
-            {dep ? <><span className="spin" /> 发布中</> : <><Rocket size={16} /> 发布</>}
-          </button>
+          <button className="btn btn-primary" onClick={() => setModal('add')}><Plus size={16} /> 新建</button>
         </div>
 
         {/* Grid */}

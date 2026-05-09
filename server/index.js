@@ -138,42 +138,32 @@ function getCertStatus() {
          fs.existsSync(path.join(CERT_DIR, KEY_FILE));
 }
 
-// Deploy all sites — each site gets its own config file
-function deployAll() {
-  const config = loadConfig();
-  if (!getCertStatus()) throw new Error('请先上传 SSL 证书');
-  if (config.sites.length === 0) throw new Error('请至少添加一个站点');
-
+// Deploy ONE site — generate config, symlink, test, reload
+function deploySite(site) {
   if (!fs.existsSync(SITES_AVAILABLE)) fs.mkdirSync(SITES_AVAILABLE, { recursive: true });
   if (!fs.existsSync(SITES_ENABLED)) fs.mkdirSync(SITES_ENABLED, { recursive: true });
 
-  // Clean old auto-nginx configs
-  for (const f of fs.readdirSync(SITES_AVAILABLE)) {
-    const content = fs.readFileSync(path.join(SITES_AVAILABLE, f), 'utf-8');
-    if (content.startsWith('# Auto Nginx')) {
-      try { fs.unlinkSync(path.join(SITES_ENABLED, f)); } catch (e) {}
-      fs.unlinkSync(path.join(SITES_AVAILABLE, f));
-    }
+  const filename = `auto-nginx_${site.domain}`;
+  const availablePath = path.join(SITES_AVAILABLE, filename);
+  const enabledPath = path.join(SITES_ENABLED, filename);
+
+  fs.writeFileSync(availablePath, generateSiteConfig(site), 'utf-8');
+  if (!fs.existsSync(enabledPath)) {
+    fs.symlinkSync(availablePath, enabledPath);
   }
 
-  // Generate new configs
-  for (const site of config.sites) {
-    const filename = `auto-nginx_${site.domain}`;
-    const availablePath = path.join(SITES_AVAILABLE, filename);
-    const enabledPath = path.join(SITES_ENABLED, filename);
-
-    fs.writeFileSync(availablePath, generateSiteConfig(site), 'utf-8');
-    if (!fs.existsSync(enabledPath)) {
-      fs.symlinkSync(availablePath, enabledPath);
-    }
-  }
-
-  try {
-    execSync('nginx -t 2>&1', { encoding: 'utf-8' });
-  } catch (e) {
-    throw new Error(`Nginx 配置检测失败: ${e.message}`);
-  }
+  execSync('nginx -t 2>&1', { encoding: 'utf-8' });
   execSync('nginx -s reload 2>&1');
+}
+
+// Remove ONE site config
+function removeSiteConfig(site) {
+  const filename = `auto-nginx_${site.domain}`;
+  const enabledPath = path.join(SITES_ENABLED, filename);
+  const availablePath = path.join(SITES_AVAILABLE, filename);
+  try { if (fs.existsSync(enabledPath)) fs.unlinkSync(enabledPath); } catch (e) {}
+  try { if (fs.existsSync(availablePath)) fs.unlinkSync(availablePath); } catch (e) {}
+  try { execSync('nginx -s reload 2>&1'); } catch (e) {}
 }
 
 // ===================== API =====================
@@ -206,17 +196,9 @@ app.post('/api/nginx-install', (req, res) => {
 app.get('/api/status', (req, res) => {
   const config = loadConfig();
   const certReady = getCertStatus();
-  // Check deploy status: any auto-nginx config in sites-enabled?
-  let deployed = false;
-  try {
-    const files = fs.readdirSync(SITES_ENABLED);
-    deployed = files.some(f => f.startsWith('auto-nginx_'));
-  } catch (e) {}
-
   res.json({
     sites: config.sites,
     certReady,
-    deployed,
   });
 });
 
@@ -231,7 +213,7 @@ app.post('/api/certificate', upload.fields([
   res.json({ success: true, message: '证书上传成功', certReady: true });
 });
 
-// Add site (name + domain + port)
+// Add site → auto generate config & reload nginx
 app.post('/api/sites', (req, res) => {
   const { name, domain, port } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: '请填写站点名称' });
@@ -240,38 +222,44 @@ app.post('/api/sites', (req, res) => {
   const portNum = parseInt(port, 10);
   if (isNaN(portNum) || portNum < 1 || portNum > 65535) return res.status(400).json({ error: '端口号 1-65535' });
 
+  if (!getCertStatus()) return res.status(400).json({ error: '请先上传 SSL 证书' });
+
   const config = loadConfig();
   if (config.sites.find(s => s.name === name.trim())) {
     return res.status(400).json({ error: `站点名称 "${name}" 已存在` });
   }
 
-  config.sites.push({
+  const site = {
     name: name.trim(),
     domain: domain.trim(),
     port: String(portNum),
     createdAt: new Date().toISOString()
-  });
+  };
+
+  try {
+    deploySite(site);
+  } catch (e) {
+    return res.status(500).json({ error: `Nginx 配置失败: ${e.message}` });
+  }
+
+  config.sites.push(site);
   saveConfig(config);
-  res.json({ success: true, message: `站点 "${name}" 已添加` });
+  res.json({ success: true, message: `站点 "${name}" 已部署` });
 });
 
-// Delete site
+// Delete site → auto remove config & reload nginx
 app.delete('/api/sites/:name', (req, res) => {
   const name = decodeURIComponent(req.params.name);
   const config = loadConfig();
+  const site = config.sites.find(s => s.name === name);
+
+  if (site) {
+    removeSiteConfig(site);
+  }
+
   config.sites = config.sites.filter(s => s.name !== name);
   saveConfig(config);
   res.json({ success: true, message: `站点 "${name}" 已删除` });
-});
-
-// Deploy all sites
-app.post('/api/deploy', (req, res) => {
-  try {
-    deployAll();
-    res.json({ success: true, message: '部署成功！Nginx 已重载' });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
 });
 
 // SPA fallback
