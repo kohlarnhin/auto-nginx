@@ -364,6 +364,55 @@ app.delete('/api/sites/:name', (req, res) => {
   res.json({ success: true, message: `站点 "${name}" 已删除` });
 });
 
+// Get site nginx config
+app.get('/api/sites/:name/config', (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const config = loadConfig();
+  const site = config.sites.find(s => s.name === name);
+  if (!site) return res.status(404).json({ error: '站点不存在' });
+
+  const filename = `auto-nginx_${site.domain}`;
+  const filePath = path.join(SITES_AVAILABLE, filename);
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    res.json({ success: true, content });
+  } catch (e) {
+    res.status(404).json({ error: '配置文件不存在，请重新添加站点' });
+  }
+});
+
+// Update site nginx config
+app.put('/api/sites/:name/config', (req, res) => {
+  const name = decodeURIComponent(req.params.name);
+  const { content } = req.body;
+  if (!content?.trim()) return res.status(400).json({ error: '配置内容不能为空' });
+
+  const config = loadConfig();
+  const site = config.sites.find(s => s.name === name);
+  if (!site) return res.status(404).json({ error: '站点不存在' });
+
+  const filename = `auto-nginx_${site.domain}`;
+  const filePath = path.join(SITES_AVAILABLE, filename);
+
+  // Backup current config
+  let backup = null;
+  try { backup = fs.readFileSync(filePath, 'utf-8'); } catch (e) {}
+
+  // Write new config
+  fs.writeFileSync(filePath, content, 'utf-8');
+
+  // Test nginx config
+  try {
+    execSync('nginx -t 2>&1', { encoding: 'utf-8' });
+    execSync('nginx -s reload 2>&1');
+    res.json({ success: true, message: '配置已保存并生效' });
+  } catch (e) {
+    // Rollback on failure
+    if (backup) fs.writeFileSync(filePath, backup, 'utf-8');
+    res.status(400).json({ error: `配置语法错误，已回滚: ${e.message}` });
+  }
+});
+
 // SPA fallback
 if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {

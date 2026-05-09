@@ -305,18 +305,25 @@ body {
   transform: translateY(-2px);
 }
 
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
 .card-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--accent-soft);
   color: var(--accent);
+  flex-shrink: 0;
 }
 
-.card-body { flex: 1; }
+.card-body { flex: 1; min-width: 0; }
 
 .card-name {
   font-size: 1rem;
@@ -330,9 +337,46 @@ body {
   font-size: 0.78rem;
   color: var(--text-3);
   font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.card-actions { margin-top: auto; display: flex; justify-content: flex-end; }
+.card-link {
+  color: var(--accent);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: opacity 0.15s;
+}
+.card-link:hover { opacity: 0.7; }
+
+.card-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* ===== CONFIG EDITOR ===== */
+.dialog-wide { max-width: 680px; }
+
+.config-editor {
+  width: 100%;
+  min-height: 400px;
+  padding: 20px 24px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg-2);
+  tab-size: 4;
+}
 
 /* ===== EMPTY STATE ===== */
 .empty {

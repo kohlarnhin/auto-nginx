@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import {
   Server, Settings, Check, X, Globe, Plus, Trash2,
-  Shield, ChevronRight, ChevronDown, Search, Download, Lock, Cloud
+  Shield, ChevronRight, ChevronDown, Search, Download, Lock, Cloud,
+  ExternalLink, FileCode
 } from 'lucide-react';
 
 const API = '/api';
@@ -223,17 +224,90 @@ function AddModal({ show, onClose, onDone, notify }) {
   );
 }
 
+/* ── Config Modal ── */
+function ConfigModal({ site, onClose, notify }) {
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API}/sites/${encodeURIComponent(site.name)}/config`);
+        const d = await r.json();
+        if (r.ok) setContent(d.content);
+        else notify({ type: 'error', message: d.error });
+      } catch (e) { notify({ type: 'error', message: '加载失败' }); }
+      finally { setLoading(false); }
+    })();
+  }, [site.name]);
+
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch(`${API}/sites/${encodeURIComponent(site.name)}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      const d = await r.json();
+      notify({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
+      if (r.ok) onClose();
+    } catch (e) { notify({ type: 'error', message: '保存失败' }); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog dialog-wide" onClick={e => e.stopPropagation()}>
+        <div className="dlg-head">
+          <h2>{site.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', fontWeight: 400 }}>Nginx 配置</span></h2>
+          <button className="dlg-x" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="dlg-body" style={{ padding: 0 }}>
+          {loading ? (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}><span className="spin" /> 加载中…</div>
+          ) : (
+            <textarea
+              className="config-editor"
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              spellCheck={false}
+            />
+          )}
+        </div>
+        <div className="dlg-foot">
+          <button className="btn btn-ghost" onClick={onClose}>取消</button>
+          <button className="btn btn-primary" onClick={saveConfig} disabled={saving || loading}>
+            {saving ? <><span className="spin" /> 保存中…</> : '保存并生效'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Site Card ── */
-const SiteCard = memo(function SiteCard({ site, onDel }) {
+const SiteCard = memo(function SiteCard({ site, onDel, onEdit }) {
   return (
     <div className="card">
-      <div className="card-icon"><Globe size={20} /></div>
-      <div className="card-body">
-        <div className="card-name">{site.name}</div>
-        <div className="card-sub">{site.domain} → :{site.port}</div>
+      <div className="card-head">
+        <div className="card-icon"><Globe size={18} /></div>
+        <div className="card-body">
+          <div className="card-name">{site.name}</div>
+          <div className="card-sub">
+            <a href={`https://${site.domain}`} target="_blank" rel="noopener noreferrer" className="card-link" onClick={e => e.stopPropagation()}>
+              {site.domain} <ExternalLink size={11} />
+            </a>
+            <span style={{ color: 'var(--text-4)' }}>→ :{site.port}</span>
+          </div>
+        </div>
       </div>
       <div className="card-actions">
-        <button className="btn btn-danger btn-sm" onClick={() => onDel(site.name)}>
+        <button className="btn btn-ghost btn-sm" onClick={() => onEdit(site)} title="编辑配置">
+          <FileCode size={14} />
+        </button>
+        <button className="btn btn-danger btn-sm" onClick={() => onDel(site.name)} title="删除">
           <Trash2 size={14} />
         </button>
       </div>
@@ -250,6 +324,7 @@ export default function App() {
   const [q, setQ] = useState('');
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
+  const [editSite, setEditSite] = useState(null);
 
   const loadNginx = useCallback(async () => {
     setChk(true);
@@ -365,7 +440,7 @@ export default function App() {
               </div>
             </div>
           ) : (
-            list.map(s => <SiteCard key={s.name} site={s} onDel={doDel} />)
+            list.map(s => <SiteCard key={s.name} site={s} onDel={doDel} onEdit={setEditSite} />)
           )}
         </div>
       </main>
@@ -375,6 +450,9 @@ export default function App() {
       )}
       {modal === 'add' && (
         <AddModal show onClose={() => setModal(null)} onDone={loadStatus} notify={setToast} />
+      )}
+      {editSite && (
+        <ConfigModal site={editSite} onClose={() => setEditSite(null)} notify={setToast} />
       )}
       <Toast data={toast} onClose={() => setToast(null)} />
     </>
