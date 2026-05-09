@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import {
   Server, Settings, Check, X, Globe, Plus, Trash2,
   Shield, ChevronRight, ChevronDown, Search, Download, Lock, Cloud,
-  ExternalLink, FileCode
+  ExternalLink, FileCode, Terminal
 } from 'lucide-react';
 
 const API = '/api';
@@ -261,20 +261,30 @@ function ConfigModal({ site, onClose, notify }) {
     <div className="overlay" onClick={onClose}>
       <div className="dialog dialog-wide" onClick={e => e.stopPropagation()}>
         <div className="dlg-head">
-          <h2>{site.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', fontWeight: 400 }}>Nginx 配置</span></h2>
-          <button className="dlg-x" onClick={onClose}><X size={16} /></button>
+          <h2>{site.name} <span style={{ fontSize: '13px', color: 'var(--text-3)', fontWeight: 500, marginLeft: 8 }}>Nginx 配置</span></h2>
+          <button className="dlg-x" onClick={onClose}><X size={18} strokeWidth={2} /></button>
         </div>
-        <div className="dlg-body" style={{ padding: 0 }}>
-          {loading ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}><span className="spin" /> 加载中…</div>
-          ) : (
-            <textarea
-              className="config-editor"
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              spellCheck={false}
-            />
-          )}
+        <div className="dlg-body">
+          <div className="config-editor-wrap">
+            <div className="config-editor-header">
+              <div className="mac-dots">
+                <div className="mac-dot red"></div>
+                <div className="mac-dot yellow"></div>
+                <div className="mac-dot green"></div>
+              </div>
+              <span style={{ marginLeft: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Terminal size={12} /> {site.name}.conf</span>
+            </div>
+            {loading ? (
+              <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF' }}><span className="spin" style={{ borderColor: 'rgba(255,255,255,0.1)', borderTopColor: 'currentColor' }} /> 加载中…</div>
+            ) : (
+              <textarea
+                className="config-editor"
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                spellCheck={false}
+              />
+            )}
+          </div>
         </div>
         <div className="dlg-foot">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
@@ -292,7 +302,7 @@ const SiteCard = memo(function SiteCard({ site, onDel, onEdit }) {
   return (
     <div className="card">
       <div className="card-head">
-        <div className="card-icon"><Globe size={18} /></div>
+        <div className="card-icon"><Globe size={24} strokeWidth={1.5} /></div>
         <div className="card-body">
           <div className="card-name">{site.name}</div>
           <div className="card-port">端口 {site.port}</div>
@@ -306,10 +316,10 @@ const SiteCard = memo(function SiteCard({ site, onDel, onEdit }) {
       </div>
       <div className="card-actions">
         <button className="btn btn-ghost btn-sm" onClick={() => onEdit(site)} title="编辑配置">
-          <FileCode size={14} />
+          <FileCode size={16} strokeWidth={1.5} /> 编辑配置
         </button>
-        <button className="btn btn-danger btn-sm" onClick={() => onDel(site.name)} title="删除">
-          <Trash2 size={14} />
+        <button className="btn btn-danger btn-sm" onClick={() => onDel(site.name)} title="删除" style={{ padding: '0 10px' }}>
+          <Trash2 size={16} strokeWidth={1.5} />
         </button>
       </div>
     </div>
