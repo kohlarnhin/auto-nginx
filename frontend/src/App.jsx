@@ -28,28 +28,9 @@ function Toast({ data, onClose }) {
 function SettingsModal({ show, onClose, nginx, onInstall, installing, status, notify, onRefresh }) {
   const [cf, setCf] = useState(null);
   const [kf, setKf] = useState(null);
-  const [dom, setDom] = useState('');
   const [uping, setUping] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (show && status?.domain) setDom(status.domain); }, [show, status?.domain]);
   if (!show) return null;
-
-  const saveDomain = async () => {
-    if (!dom.trim()) return;
-    setSaving(true);
-    try {
-      const r = await fetch(`${API}/domain`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: dom.trim() }),
-      });
-      const d = await r.json();
-      notify({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
-      if (r.ok) onRefresh();
-    } catch (e) { notify({ type: 'error', message: e.message }); }
-    finally { setSaving(false); }
-  };
 
   const uploadCert = async () => {
     if (!cf || !kf) return;
@@ -100,19 +81,6 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
                 {installing ? <><span className="spin" /> 安装中…</> : <><Download size={14} /> {nginx?.canAutoInstall ? `通过 ${nginx.packageManager} 安装` : '需手动安装'}</>}
               </button>
             )}
-          </div>
-
-          <div className="sep" />
-
-          {/* Domain */}
-          <div className="fg">
-            <span className="sec-label">主域名</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input className="fi" placeholder="example.com" value={dom} onChange={e => setDom(e.target.value)} style={{ flex: 1 }} />
-              <button className="btn btn-primary btn-sm" onClick={saveDomain} disabled={saving || !dom.trim()}>
-                {saving ? <span className="spin" /> : '保存'}
-              </button>
-            </div>
           </div>
 
           <div className="sep" />
