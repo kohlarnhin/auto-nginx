@@ -29,6 +29,8 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
   const [cf, setCf] = useState(null);
   const [kf, setKf] = useState(null);
   const [uping, setUping] = useState(false);
+  const [cfToken, setCfToken] = useState('');
+  const [savingToken, setSavingToken] = useState(false);
 
   if (!show) return null;
 
@@ -45,6 +47,22 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
       else notify({ type: 'error', message: d.error });
     } catch (e) { notify({ type: 'error', message: e.message }); }
     finally { setUping(false); }
+  };
+
+  const saveCfToken = async () => {
+    if (!cfToken.trim()) return;
+    setSavingToken(true);
+    try {
+      const r = await fetch(`${API}/cf-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: cfToken.trim() }),
+      });
+      const d = await r.json();
+      notify({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
+      if (r.ok) { setCfToken(''); onRefresh(); }
+    } catch (e) { notify({ type: 'error', message: e.message }); }
+    finally { setSavingToken(false); }
   };
 
   return (
@@ -108,6 +126,34 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
             <button className="btn btn-secondary" onClick={uploadCert} disabled={uping || !cf || !kf} style={{ width: '100%' }}>
               {uping ? <><span className="spin" /> 上传中…</> : <><Shield size={14} /> 应用证书</>}
             </button>
+          </div>
+
+          <div className="sep" />
+
+          {/* Cloudflare */}
+          <div className="fg">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="sec-label">Cloudflare DNS</span>
+              {status?.cfTokenSet && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Check size={10} /> 已配置
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="fi"
+                type="password"
+                placeholder={status?.cfTokenSet ? '已保存，输入新值可覆盖' : 'Cloudflare API Token'}
+                value={cfToken}
+                onChange={e => setCfToken(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button className="btn btn-primary btn-sm" onClick={saveCfToken} disabled={savingToken || !cfToken.trim()}>
+                {savingToken ? <span className="spin" /> : '保存'}
+              </button>
+            </div>
+            <div className="fh">配置后添加站点时将自动创建 DNS A 记录指向本机公网 IP</div>
           </div>
         </div>
       </div>
