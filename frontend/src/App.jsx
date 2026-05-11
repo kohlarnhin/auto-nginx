@@ -2,10 +2,23 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import {
   Server, Settings, Check, X, Globe, Plus, Trash2,
   Shield, ChevronRight, ChevronDown, Search, Download, Lock, Cloud,
-  ExternalLink, FileCode, Terminal
+  ExternalLink, FileCode, Terminal, LogOut
 } from 'lucide-react';
 
 const API = '/api';
+
+/* ── Auth helpers ── */
+function getToken() { return localStorage.getItem('auto-nginx-token'); }
+function setToken(t) { localStorage.setItem('auto-nginx-token', t); }
+function clearToken() { localStorage.removeItem('auto-nginx-token'); }
+function authHeaders() {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+async function authFetch(url, opts = {}) {
+  opts.headers = { ...opts.headers, ...authHeaders() };
+  return fetch(url, opts);
+}
 
 /* ── Toast ── */
 const Toast = memo(function Toast({ data, onClose }) {
@@ -24,6 +37,62 @@ const Toast = memo(function Toast({ data, onClose }) {
     </div>
   );
 });
+
+/* ── Login Screen ── */
+function LoginScreen({ onLogin, toast, setToast }) {
+  const [pwd, setPwd] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!pwd.trim()) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd }),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setToken(d.token);
+        onLogin();
+      } else {
+        setToast({ type: 'error', message: d.error || '登录失败' });
+      }
+    } catch (e) {
+      setToast({ type: 'error', message: '网络错误' });
+    }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="login-screen">
+      <div className="login-card">
+        <div className="login-icon">
+          <Lock size={32} strokeWidth={1.5} />
+        </div>
+        <h1 className="login-title">Auto Nginx</h1>
+        <p className="login-desc">请输入访问密码以继续</p>
+        <form onSubmit={submit} className="login-form">
+          <input
+            className="fi login-input"
+            type="password"
+            placeholder="输入密码"
+            value={pwd}
+            onChange={e => setPwd(e.target.value)}
+            autoFocus
+          />
+          <button className="btn btn-primary login-btn" type="submit" disabled={busy || !pwd.trim()}>
+            {busy ? <><span className="spin" /> 验证中…</> : '登 录'}
+          </button>
+        </form>
+        <p className="login-hint">密码位于服务器 <code>server/.password</code> 文件中</p>
+      </div>
+      <Toast data={toast} onClose={() => setToast(null)} />
+    </div>
+  );
+}
 
 /* ── Collapsible Section ── */
 function Section({ label, badge, defaultOpen = true, children }) {
@@ -59,7 +128,7 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
       const fd = new FormData();
       fd.append('fullchain', cf);
       fd.append('privkey', kf);
-      const r = await fetch(`${API}/certificate`, { method: 'POST', body: fd });
+      const r = await authFetch(`${API}/certificate`, { method: 'POST', body: fd });
       const d = await r.json();
       if (r.ok) { notify({ type: 'success', message: d.message }); setCf(null); setKf(null); onRefresh(); }
       else notify({ type: 'error', message: d.error });
@@ -71,7 +140,7 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
     if (!cfToken.trim()) return;
     setSavingToken(true);
     try {
-      const r = await fetch(`${API}/cf-token`, {
+      const r = await authFetch(`${API}/cf-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: cfToken.trim() }),
@@ -180,7 +249,7 @@ function AddModal({ show, onClose, onDone, notify }) {
     }
     setBusy(true);
     try {
-      const r = await fetch(`${API}/sites`, {
+      const r = await authFetch(`${API}/sites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), domain: domain.trim(), port: port.trim() }),
@@ -233,7 +302,7 @@ function ConfigModal({ site, onClose, notify }) {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`${API}/sites/${encodeURIComponent(site.name)}/config`);
+        const r = await authFetch(`${API}/sites/${encodeURIComponent(site.name)}/config`);
         const d = await r.json();
         if (r.ok) setContent(d.content);
         else notify({ type: 'error', message: d.error });
@@ -245,7 +314,7 @@ function ConfigModal({ site, onClose, notify }) {
   const saveConfig = async () => {
     setSaving(true);
     try {
-      const r = await fetch(`${API}/sites/${encodeURIComponent(site.name)}/config`, {
+      const r = await authFetch(`${API}/sites/${encodeURIComponent(site.name)}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
@@ -326,8 +395,8 @@ const SiteCard = memo(function SiteCard({ site, onDel, onEdit }) {
   );
 });
 
-/* ── App ── */
-export default function App() {
+/* ── Dashboard (Main after login) ── */
+function Dashboard({ onLogout }) {
   const [nginx, setNginx] = useState(null);
   const [chk, setChk] = useState(true);
   const [inst, setInst] = useState(false);
@@ -339,12 +408,12 @@ export default function App() {
 
   const loadNginx = useCallback(async () => {
     setChk(true);
-    try { setNginx(await (await fetch(`${API}/nginx-check`)).json()); } catch {}
+    try { setNginx(await (await authFetch(`${API}/nginx-check`)).json()); } catch {}
     finally { setChk(false); }
   }, []);
 
   const loadStatus = useCallback(async () => {
-    try { setStatus(await (await fetch(`${API}/status`)).json()); } catch {}
+    try { setStatus(await (await authFetch(`${API}/status`)).json()); } catch {}
   }, []);
 
   useEffect(() => { loadNginx(); loadStatus(); }, [loadNginx, loadStatus]);
@@ -352,7 +421,7 @@ export default function App() {
   const doInstall = useCallback(async () => {
     setInst(true);
     try {
-      const r = await fetch(`${API}/nginx-install`, { method: 'POST' });
+      const r = await authFetch(`${API}/nginx-install`, { method: 'POST' });
       const d = await r.json();
       setToast({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
       if (r.ok) loadNginx();
@@ -363,12 +432,18 @@ export default function App() {
   const doDel = useCallback(async (n) => {
     if (!confirm(`确定删除站点「${n}」？`)) return;
     try {
-      const r = await fetch(`${API}/sites/${encodeURIComponent(n)}`, { method: 'DELETE' });
+      const r = await authFetch(`${API}/sites/${encodeURIComponent(n)}`, { method: 'DELETE' });
       const d = await r.json();
       setToast({ type: r.ok ? 'success' : 'error', message: r.ok ? d.message : d.error });
       if (r.ok) loadStatus();
     } catch (e) { setToast({ type: 'error', message: '操作失败，请重试' }); }
   }, [loadStatus]);
+
+  const handleLogout = async () => {
+    try { await authFetch(`${API}/auth/logout`, { method: 'POST' }); } catch {}
+    clearToken();
+    onLogout();
+  };
 
   const sites = status?.sites || [];
   const list = q
@@ -383,52 +458,52 @@ export default function App() {
     <>
       <nav className="nav">
         <span className="nav-brand">Auto Nginx</span>
+        <button className="nav-logout" onClick={handleLogout} title="退出登录">
+          <LogOut size={16} strokeWidth={1.5} />
+        </button>
       </nav>
 
       <main className="main">
-        <h1 className="page-title">HTTPS 部署管理</h1>
-        <p className="page-desc">上传 SSL 证书，配置站点域名与端口，自动部署至 Nginx。</p>
-
-        {/* Status Strip */}
-        <div className="strip" onClick={() => setModal('settings')} role="button" tabIndex={0}>
-          <div className="strip-items">
-            {chk ? (
-              <div className="strip-item">
-                <span className="strip-label">状态</span>
-                <span className="strip-val"><span className="spin" style={{ width: 10, height: 10 }} /> 检测中</span>
-              </div>
-            ) : (
-              <>
-                <div className="strip-item">
-                  <span className="strip-label">Nginx</span>
-                  <span className="strip-val">
-                    <span className={`ind ${nginx?.installed ? 'ind-ok' : 'ind-err'}`} />
-                    {nginx?.installed ? (nginx.running ? '在线' : '已停止') : '未安装'}
-                  </span>
-                </div>
-                <div className="strip-item">
-                  <span className="strip-label">证书</span>
-                  <span className="strip-val">
-                    <span className={`ind ${status?.certReady ? 'ind-ok' : 'ind-err'}`} />
-                    {status?.certReady ? '就绪' : '未上传'}
-                  </span>
-                </div>
-                <div className="strip-item">
-                  <span className="strip-label">DNS</span>
-                  <span className="strip-val">
-                    <span className={`ind ${status?.cfTokenSet ? 'ind-ok' : 'ind-warn'}`} />
-                    {status?.cfTokenSet ? '已配置' : '未配置'}
-                  </span>
-                </div>
-              </>
-            )}
+        {/* Header: status strip inline with title */}
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1 className="page-title">站点管理</h1>
+            <p className="page-desc">SSL 证书 · 域名解析 · Nginx 反代 · 一键部署</p>
           </div>
-          <div className="strip-cta"><Settings size={13} /> 设置 <ChevronRight size={13} /></div>
-        </div>
-
-        {/* Section Head */}
-        <div className="section-head">
-          <span className="section-title">站点列表 {sites.length > 0 && <span style={{ opacity: 0.5 }}>({sites.length})</span>}</span>
+          <div className="strip" onClick={() => setModal('settings')} role="button" tabIndex={0}>
+            <div className="strip-items">
+              {chk ? (
+                <div className="strip-item">
+                  <span className="strip-val"><span className="spin" style={{ width: 10, height: 10 }} /> 检测中</span>
+                </div>
+              ) : (
+                <>
+                  <div className="strip-item">
+                    <span className="strip-label">Nginx</span>
+                    <span className="strip-val">
+                      <span className={`ind ${nginx?.installed ? 'ind-ok' : 'ind-err'}`} />
+                      {nginx?.installed ? (nginx.running ? '在线' : '已停止') : '未安装'}
+                    </span>
+                  </div>
+                  <div className="strip-item">
+                    <span className="strip-label">证书</span>
+                    <span className="strip-val">
+                      <span className={`ind ${status?.certReady ? 'ind-ok' : 'ind-err'}`} />
+                      {status?.certReady ? '就绪' : '未上传'}
+                    </span>
+                  </div>
+                  <div className="strip-item">
+                    <span className="strip-label">DNS</span>
+                    <span className="strip-val">
+                      <span className={`ind ${status?.cfTokenSet ? 'ind-ok' : 'ind-warn'}`} />
+                      {status?.cfTokenSet ? '已配置' : '未配置'}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="strip-cta"><Settings size={13} /> 设置 <ChevronRight size={13} /></div>
+          </div>
         </div>
 
         {/* Action Row */}
@@ -468,4 +543,39 @@ export default function App() {
       <Toast data={toast} onClose={() => setToast(null)} />
     </>
   );
+}
+
+/* ── App ── */
+export default function App() {
+  const [authed, setAuthed] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const token = getToken();
+      if (!token) { setChecking(false); return; }
+      try {
+        const r = await fetch(`${API}/auth/check`, { headers: { Authorization: `Bearer ${token}` } });
+        const d = await r.json();
+        if (d.authenticated) setAuthed(true);
+        else clearToken();
+      } catch {}
+      setChecking(false);
+    })();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="login-screen">
+        <div className="spin" style={{ width: 24, height: 24 }} />
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return <LoginScreen onLogin={() => setAuthed(true)} toast={toast} setToast={setToast} />;
+  }
+
+  return <Dashboard onLogout={() => setAuthed(false)} />;
 }

@@ -2,5 +2,6 @@ node_modules/
 dist/
 .env
 server/config.json
+server/.password
 *.log
 .DS_Store

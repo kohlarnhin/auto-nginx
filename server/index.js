@@ -3,6 +3,7 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { execSync } = require('child_process');
 
 const app = express();
@@ -12,6 +13,10 @@ const CERT_DIR = process.env.CERT_DIR || '/etc/nginx/ssl';
 const SITES_AVAILABLE = process.env.SITES_AVAILABLE || '/etc/nginx/sites-available';
 const SITES_ENABLED = process.env.SITES_ENABLED || '/etc/nginx/sites-enabled';
 const CONFIG_FILE = path.join(__dirname, 'config.json');
+const PASSWORD_FILE = path.join(__dirname, '.password');
+
+// --- Sessions (in-memory, simple token map) ---
+const sessions = new Map();
 
 const CERT_FILE = 'server.crt';
 const KEY_FILE = 'server.key';
@@ -24,6 +29,59 @@ app.use(express.json());
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '..', 'frontend', 'dist')));
 }
+
+// --- Password management ---
+function ensurePassword() {
+  if (fs.existsSync(PASSWORD_FILE)) {
+    return fs.readFileSync(PASSWORD_FILE, 'utf-8').trim();
+  }
+  // First boot: generate a random 16-char password
+  const pwd = crypto.randomBytes(12).toString('base64url').slice(0, 16);
+  fs.writeFileSync(PASSWORD_FILE, pwd, { mode: 0o600 });
+  console.log(`\n  ┌──────────────────────────────────────────┐`);
+  console.log(`  │  首次启动，已生成访问密码:              │`);
+  console.log(`  │  ${pwd.padEnd(38)}│`);
+  console.log(`  │  密码已保存至: server/.password          │`);
+  console.log(`  └──────────────────────────────────────────┘\n`);
+  return pwd;
+}
+
+const APP_PASSWORD = ensurePassword();
+
+// --- Auth middleware ---
+function authRequired(req, res, next) {
+  const token = req.headers['authorization']?.replace('Bearer ', '');
+  if (token && sessions.has(token)) return next();
+  return res.status(401).json({ error: '请先登录' });
+}
+
+// Auth routes (unprotected)
+app.post('/api/auth/login', (req, res) => {
+  const { password } = req.body;
+  if (!password || password !== APP_PASSWORD) {
+    return res.status(401).json({ error: '密码错误' });
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, { createdAt: Date.now() });
+  res.json({ success: true, token });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.headers['authorization']?.replace('Bearer ', '');
+  if (token) sessions.delete(token);
+  res.json({ success: true });
+});
+
+app.get('/api/auth/check', (req, res) => {
+  const token = req.headers['authorization']?.replace('Bearer ', '');
+  res.json({ authenticated: !!(token && sessions.has(token)) });
+});
+
+// Protect all /api/* routes except /api/auth/*
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/auth/')) return next();
+  return authRequired(req, res, next);
+});
 
 // --- Multer ---
 const storage = multer.diskStorage({
