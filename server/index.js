@@ -15,9 +15,6 @@ const SITES_ENABLED = process.env.SITES_ENABLED || '/etc/nginx/sites-enabled';
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const PASSWORD_FILE = path.join(__dirname, '.password');
 
-// --- Sessions (in-memory, simple token map) ---
-const sessions = new Map();
-
 const CERT_FILE = 'server.crt';
 const KEY_FILE = 'server.key';
 
@@ -51,7 +48,7 @@ const APP_PASSWORD = ensurePassword();
 // --- Auth middleware ---
 function authRequired(req, res, next) {
   const token = req.headers['authorization']?.replace('Bearer ', '');
-  if (token && sessions.has(token)) return next();
+  if (token && token === APP_PASSWORD) return next();
   return res.status(401).json({ error: '请先登录' });
 }
 
@@ -61,20 +58,17 @@ app.post('/api/auth/login', (req, res) => {
   if (!password || password !== APP_PASSWORD) {
     return res.status(401).json({ error: '密码错误' });
   }
-  const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, { createdAt: Date.now() });
-  res.json({ success: true, token });
+  // Return the password itself as the token — persists across server restarts
+  res.json({ success: true, token: APP_PASSWORD });
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  const token = req.headers['authorization']?.replace('Bearer ', '');
-  if (token) sessions.delete(token);
   res.json({ success: true });
 });
 
 app.get('/api/auth/check', (req, res) => {
   const token = req.headers['authorization']?.replace('Bearer ', '');
-  res.json({ authenticated: !!(token && sessions.has(token)) });
+  res.json({ authenticated: !!(token && token === APP_PASSWORD) });
 });
 
 // Protect all /api/* routes except /api/auth/*

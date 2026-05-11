@@ -631,6 +631,34 @@ body {
 /* ===== DIVIDER ===== */
 .sep { height: 1px; background: var(--border); margin: 8px 0; }
 
+/* ===== CLOUDFLARE TOKEN ===== */
+.cf-token-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cf-token-input-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.cf-token-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-4);
+  pointer-events: none;
+}
+
+.cf-token-input {
+  padding-left: 42px !important;
+  font-family: var(--font-mono) !important;
+  font-size: 13px !important;
+  letter-spacing: 0.02em;
+}
+
 /* ===== CONFIG EDITOR ===== */
 .config-editor-wrap {
   border-radius: 12px;

@@ -213,20 +213,36 @@ function SettingsModal({ show, onClose, nginx, onInstall, installing, status, no
 
           {/* Cloudflare */}
           <Section label="Cloudflare DNS" defaultOpen={!status?.cfTokenSet} badge={status?.cfTokenSet ? okBadge : errBadge}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                className="fi"
-                type="password"
-                placeholder={status?.cfTokenSet ? '已保存，输入新值可覆盖' : 'API Token'}
-                value={cfToken}
-                onChange={e => setCfToken(e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <button className="btn btn-primary btn-sm" onClick={saveCfToken} disabled={savingToken || !cfToken.trim()}>
-                {savingToken ? <span className="spin" /> : '保存'}
-              </button>
+            {status?.cfTokenSet && (
+              <div className="info-box" style={{ marginBottom: 12 }}>
+                <div className="info-row">
+                  <span className="info-label">API Token</span>
+                  <span className="info-val">
+                    <span className="ind ind-ok" />
+                    已配置
+                  </span>
+                </div>
+              </div>
+            )}
+            <div className="fg">
+              <label className="fl">{status?.cfTokenSet ? '更新 Token' : 'API Token'}</label>
+              <div className="cf-token-row">
+                <div className="cf-token-input-wrap">
+                  <Cloud size={16} className="cf-token-icon" />
+                  <input
+                    className="fi cf-token-input"
+                    type="password"
+                    placeholder={status?.cfTokenSet ? '输入新 Token 以覆盖' : '粘贴 Cloudflare API Token'}
+                    value={cfToken}
+                    onChange={e => setCfToken(e.target.value)}
+                  />
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={saveCfToken} disabled={savingToken || !cfToken.trim()}>
+                  {savingToken ? <span className="spin" /> : '保存'}
+                </button>
+              </div>
+              <div className="fh">添加站点时将自动创建 DNS A 记录解析至本机</div>
             </div>
-            <div className="fh">添加站点时自动创建 DNS 解析</div>
           </Section>
         </div>
       </div>
